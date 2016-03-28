@@ -14,7 +14,7 @@
 #define RIGHT 1
 #define LEFT 2
 
-volatile uint32_t buttonSpec[3][3] = {{0},{0},{0}}; // [timesPressed, justPressed, ?uncertain?]
+volatile uint32_t buttonSpec[3][3] = {{0},{0},{0}}; // [timesPressed, justPressed, timerWhenUpdate]
 volatile uint32_t timer = 0; // TODO: Handle overflow. Will Currently last 4.97 days.
 volatile uint32_t newWatts = 0; //Is this safe?
 void timerCallback(){
@@ -23,11 +23,11 @@ void timerCallback(){
 
 
 uint16_t wattsToVolts(uint32_t watts, uint16_t res) {
-	// Units: mV, mW, mOhm
-	// V = sqrt(P * R)
-	// Round to nearest multiple of 10
-	uint16_t volts = (sqrt(watts * res) + 5) / 10;
-	return volts * 10;
+    // Units: mV, mW, mOhm
+    // V = sqrt(P * R)
+    // Round to nearest multiple of 10
+    uint16_t volts = (sqrt(watts * res) + 5) / 10;
+    return volts * 10;
 }
 
 uint16_t correctVoltage(uint16_t currentVolt, uint32_t currentWatt, uint16_t res) {
@@ -52,6 +52,9 @@ uint16_t correctVoltage(uint16_t currentVolt, uint32_t currentWatt, uint16_t res
 
 // TODO: Join each callback into one. (?) Is this needed?
 void buttonFireCallback(uint8_t state){ // Only gets called when something happens.
+    if (timer - buttonSpec[FIRE][2] > 60){
+        buttonSpec[FIRE][0] = 0;
+    }
     if (state & BUTTON_MASK_FIRE){
         buttonSpec[FIRE][0]++;
         buttonSpec[FIRE][1] = 1;
@@ -63,6 +66,9 @@ void buttonFireCallback(uint8_t state){ // Only gets called when something happe
 }
 
 void buttonRightCallback(uint8_t state){ // Only gets called when something happens.
+    if (timer - buttonSpec[RIGHT][2] > 60){
+        buttonSpec[RIGHT][0] = 0;
+    }
     if (state & BUTTON_MASK_RIGHT){
         buttonSpec[RIGHT][0]++;
         buttonSpec[RIGHT][1] = 1;
@@ -76,6 +82,9 @@ void buttonRightCallback(uint8_t state){ // Only gets called when something happ
 
 
 void buttonLeftCallback(uint8_t state){ // Only gets called when something happens.
+    if (timer - buttonSpec[LEFT][2] > 60){
+        buttonSpec[LEFT][0] = 0;
+    }
     if (state & BUTTON_MASK_LEFT){
         buttonSpec[LEFT][0]++;
         buttonSpec[LEFT][1] = 1;
@@ -89,12 +98,21 @@ void buttonLeftCallback(uint8_t state){ // Only gets called when something happe
 
 
 int main(){
-    char buf[100];
+    // TODO:    Add Stealth mode.
+    //          Add TCR (Formulas?)
+    //          Add bypass mode. (?)
+    //          Implement a better font. With support for Omega etc.
+    //          Fixed fields for values and strings.
+    //          Add a small snake game. (?) What would the memory impact be? Trigger? left left right right fire 2x.
+    //          See how puff and time is implemented and use these mem locations for something cool.
+    //          Add volt mode. (?)
+    char buf[200];
+    const char *atomState, *batteryState;
     uint8_t shouldFire;
-	uint16_t volts, displayVolts, newVolts/*, battVolts*/; // Unit mV
-	uint32_t watts; // Unit mW
-	uint8_t btnState;/*, battPerc, boardTemp*/;
-	Atomizer_Info_t atomInfo;
+    uint16_t volts, displayVolts; /*, battVolts*/ // Unit mV
+    uint32_t watts; // Unit mW
+    uint8_t btnState;/*, battPerc, boardTemp*/
+    Atomizer_Info_t atomInfo;
     
     Atomizer_ReadInfo(&atomInfo);
     
@@ -107,6 +125,10 @@ int main(){
     Button_CreateCallback(buttonFireCallback, BUTTON_MASK_FIRE);
     Button_CreateCallback(buttonRightCallback, BUTTON_MASK_RIGHT);
     Button_CreateCallback(buttonLeftCallback, BUTTON_MASK_LEFT);
+    //Show logo!
+    Display_PutPixels(0, 32, Bitmap_evicSdk, Bitmap_evicSdk_width, Bitmap_evicSdk_height);
+    Display_Update();
+    Timer_DelayMs(500);
     // Main loop!
     newWatts = watts;
     while(1){
@@ -155,16 +177,36 @@ int main(){
         
         volts = correctVoltage(volts, watts, atomInfo.resistance);
         Atomizer_SetOutputVoltage(volts);
-
-		displayVolts = Atomizer_IsOn() ? atomInfo.voltage : volts;
+        switch(Atomizer_GetError()) {
+            case SHORT:
+                atomState = "SHORT";
+                break;
+            case OPEN:
+                atomState = "NO ATOM";
+                break;
+            default:
+                 atomState = Atomizer_IsOn() ? "FIRING" : "";
+                break;
+        }
+        if (Battery_IsPresent()){
+            if (Battery_IsCharging()){
+                batteryState = "Charging";
+            } else {
+                batteryState = "";
+            }
+        } else {
+            batteryState = "USB";
+        }
+        displayVolts = Atomizer_IsOn() ? atomInfo.voltage : volts;
         
-        siprintf(buf, "P:%3lu.%luW\nV:%3d.%02d\n%1d.%02d Ohm\nBV:%uV\nI:%2d.%02dA",
+        siprintf(buf, "P:%3lu.%luW\nV:%3d.%02d\n%1d.%02d Ohm\nBV:%uV\nI:%2d.%02dA\n%s\n%s\n%d",
         watts / 1000, watts % 1000 / 100,
-		displayVolts / 1000, displayVolts % 1000 / 10,
+        displayVolts / 1000, displayVolts % 1000 / 10,
         atomInfo.resistance / 1000, atomInfo.resistance % 1000 / 10, Battery_GetVoltage(),
-        atomInfo.current / 1000, atomInfo.current % 1000 / 10);
-		Display_Clear();
-		Display_PutText(0, 0, buf, FONT_DEJAVU_8PT);
-		Display_Update();
+        atomInfo.current / 1000, atomInfo.current % 1000 / 10,
+        atomState, batteryState, buttonSpec[RIGHT][0]);
+        Display_Clear();
+        Display_PutText(0, 0, buf, FONT_DEJAVU_8PT);
+        Display_Update();
     }
 }

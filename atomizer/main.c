@@ -144,8 +144,10 @@ int main() {
 
         if ((btnState >= BUTTON_MASK_LEFT + BUTTON_MASK_RIGHT) || (btnState == BUTTON_MASK_LEFT + BUTTON_MASK_FIRE) || (btnState == BUTTON_MASK_RIGHT + BUTTON_MASK_FIRE)) {
             newWatts_Open = 0;
-        } else {
+        } else if (mode == 0){
             newWatts_Open = 1;
+        } else {
+            newWatts_Open = 0;
         }
         if(buttonSpec[FIRE][0] >= 3 && buttonSpec[FIRE][1] == 1) {
             // FIXME, this should only trigger if we are certain we won't

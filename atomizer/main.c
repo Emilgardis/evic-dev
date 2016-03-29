@@ -103,6 +103,8 @@ int main(){
     //          See how puff and time is implemented and use these mem locations for something cool.
     //          Add volt mode. (?)
     char buf[200];
+    uint8_t mode = 0;
+    uint32_t modeTime = timer;
     const char *atomState, *batteryState;
     uint8_t shouldFire;
     uint16_t volts, displayVolts; /*, battVolts*/ // Unit mV
@@ -141,7 +143,48 @@ int main(){
         }else{
             newWatts_Open = 1;
         }
+        if(buttonSpec[FIRE][0] >= 3 && buttonSpec[FIRE][1] == 1){
+            // FIXME, this should only trigger if we are certain we won't
+            // press FIRE again. (time since release > 40?).
+            // Current implementation checks if mode was changed in the recent time, and thus doesn't do anything if it was.
+            uint32_t elapsed = timer - modeTime;
+            uint8_t breakout = 0;
 
+            if (elapsed < 60){ // timesFired >= 3 was only for sleep mode.
+                breakout = 1;
+            }
+            
+            if (!breakout && (mode != 2) && buttonSpec[FIRE][0] == 5){
+                mode = 2;
+                modeTime = timer; // Should not be needed when implemented.
+                breakout = 1;
+            }else // if
+
+            /* FIXME: This shall be removed later when sleep(powerdown) mode has been implemented by the SDK*/
+            if (!breakout && buttonSpec[FIRE][0] == 5){
+                mode = 0;
+                modeTime = timer;
+                breakout = 1;
+            }
+            
+            if (mode == 0 && !breakout){
+            // Now We are in a special mode! Woo!
+            // This will be implemented but how?
+            // Ideas: We separate the display and wattage update 
+            // -portion of this code into their own functions. 
+            // And then depending on a variable called 'mode', we will
+            // Do the proper handling of button pushes.
+            // 'mode' will be set to three states
+            // 1: Normal, 2: Config, 3: Sleep.
+            // For now, just show that we have catched this.
+                mode = 1;
+                modeTime = timer;
+            }else if (mode == 1 && !breakout){
+                // Exit config mode
+                mode = 0;
+                modeTime = timer;
+            }
+        }
         if(!Atomizer_IsOn() && (btnState == BUTTON_MASK_FIRE) && // Only fire if fire is pressed alone.
             (atomInfo.resistance != 0) && (Atomizer_GetError() == OK) && shouldFire){
                 Atomizer_Control(1);
@@ -203,12 +246,12 @@ int main(){
         }
         displayVolts = Atomizer_IsOn() ? atomInfo.voltage : volts;
         
-        siprintf(buf, "P:%3lu.%luW\nV:%3d.%02d\n%1d.%02d Ohm\nBV:%uV\nI:%2d.%02dA\n%s\n%s\n%d  %d",
+        siprintf(buf, "P:%3lu.%luW\nV:%3d.%02d\n%1d.%02d Ohm\nBV:%uV\nI:%2d.%02dA\n%s\n%s\n%d %d %d\n%d",
         watts / 1000, watts % 1000 / 100,
         displayVolts / 1000, displayVolts % 1000 / 10,
         atomInfo.resistance / 1000, atomInfo.resistance % 1000 / 10, Battery_GetVoltage(),
         atomInfo.current / 1000, atomInfo.current % 1000 / 10,
-        atomState, batteryState, buttonSpec[LEFT][0], buttonSpec[RIGHT][0]);
+        atomState, batteryState, buttonSpec[LEFT][0], buttonSpec[FIRE][0], buttonSpec[RIGHT][0], mode);
         Display_Clear();
         Display_PutText(0, 0, buf, FONT_DEJAVU_8PT);
         Display_Update();

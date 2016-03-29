@@ -17,6 +17,7 @@
 volatile uint32_t buttonSpec[3][3] = {{0},{0},{0}}; // [timesPressed, justPressed, timerWhenUpdate]
 volatile uint32_t timer = 0; // TODO: Handle overflow. Will Currently last 4.97 days.
 volatile uint32_t newWatts = 0; //Is this safe?
+volatile uint8_t newWatts_Open = 1; // If this is true, then newWatts can be modified.
 void timerCallback(){
     timer++;
 }
@@ -52,9 +53,6 @@ uint16_t correctVoltage(uint16_t currentVolt, uint32_t currentWatt, uint16_t res
 
 // TODO: Join each callback into one. (?) Is this needed?
 void buttonFireCallback(uint8_t state){ // Only gets called when something happens.
-    if (timer - buttonSpec[FIRE][2] > 60){
-        buttonSpec[FIRE][0] = 0;
-    }
     if (state & BUTTON_MASK_FIRE){
         buttonSpec[FIRE][0]++;
         buttonSpec[FIRE][1] = 1;
@@ -66,14 +64,13 @@ void buttonFireCallback(uint8_t state){ // Only gets called when something happe
 }
 
 void buttonRightCallback(uint8_t state){ // Only gets called when something happens.
-    if (timer - buttonSpec[RIGHT][2] > 60){
-        buttonSpec[RIGHT][0] = 0;
-    }
     if (state & BUTTON_MASK_RIGHT){
         buttonSpec[RIGHT][0]++;
         buttonSpec[RIGHT][1] = 1;
         buttonSpec[RIGHT][2] = timer;
-        newWatts += 100;
+        if (newWatts_Open && (state == BUTTON_MASK_RIGHT)){
+            newWatts += 100;
+        }
     } else {
         buttonSpec[RIGHT][1] = 0;
         buttonSpec[RIGHT][2] = timer;
@@ -82,14 +79,13 @@ void buttonRightCallback(uint8_t state){ // Only gets called when something happ
 
 
 void buttonLeftCallback(uint8_t state){ // Only gets called when something happens.
-    if (timer - buttonSpec[LEFT][2] > 60){
-        buttonSpec[LEFT][0] = 0;
-    }
     if (state & BUTTON_MASK_LEFT){
         buttonSpec[LEFT][0]++;
         buttonSpec[LEFT][1] = 1;
         buttonSpec[LEFT][2] = timer;
-        newWatts -= 100;
+        if (newWatts_Open && (state == BUTTON_MASK_LEFT)){
+            newWatts -= 100;
+        }
     } else {
         buttonSpec[LEFT][1] = 0;
         buttonSpec[LEFT][2] = timer;
@@ -139,6 +135,12 @@ int main(){
             shouldFire = 1;
         else
             shouldFire = 0;
+        
+        if ((btnState >= BUTTON_MASK_LEFT + BUTTON_MASK_RIGHT) || (btnState == BUTTON_MASK_LEFT + BUTTON_MASK_FIRE) || (btnState == BUTTON_MASK_RIGHT + BUTTON_MASK_FIRE)) {
+            newWatts_Open = 0;
+        }else{
+            newWatts_Open = 1;
+        }
 
         if(!Atomizer_IsOn() && (btnState == BUTTON_MASK_FIRE) && // Only fire if fire is pressed alone.
             (atomInfo.resistance != 0) && (Atomizer_GetError() == OK) && shouldFire){
@@ -148,12 +150,14 @@ int main(){
         }
        
 
-        for(int i=1; i<=2; i++){
+        for(int i=0; i<=2; i++){
             uint32_t mod = 1; 
             if (i == LEFT)
                 mod = -1;
-
-            if (buttonSpec[i][1] == 1){
+            if (timer - buttonSpec[i][2] > 60){
+                buttonSpec[i][0] = 0;
+            }
+            if (buttonSpec[i][1] == 1 && (i != 0) && newWatts_Open){
                 uint32_t elapsed = timer - buttonSpec[i][2];
 
                 if (elapsed > 60 && elapsed < 180) {
@@ -199,12 +203,12 @@ int main(){
         }
         displayVolts = Atomizer_IsOn() ? atomInfo.voltage : volts;
         
-        siprintf(buf, "P:%3lu.%luW\nV:%3d.%02d\n%1d.%02d Ohm\nBV:%uV\nI:%2d.%02dA\n%s\n%s\n%d",
+        siprintf(buf, "P:%3lu.%luW\nV:%3d.%02d\n%1d.%02d Ohm\nBV:%uV\nI:%2d.%02dA\n%s\n%s\n%d  %d",
         watts / 1000, watts % 1000 / 100,
         displayVolts / 1000, displayVolts % 1000 / 10,
         atomInfo.resistance / 1000, atomInfo.resistance % 1000 / 10, Battery_GetVoltage(),
         atomInfo.current / 1000, atomInfo.current % 1000 / 10,
-        atomState, batteryState, buttonSpec[RIGHT][0]);
+        atomState, batteryState, buttonSpec[LEFT][0], buttonSpec[RIGHT][0]);
         Display_Clear();
         Display_PutText(0, 0, buf, FONT_DEJAVU_8PT);
         Display_Update();

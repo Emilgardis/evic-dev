@@ -176,7 +176,7 @@ int main(){
             // Do the proper handling of button pushes.
             // 'mode' will be set to three states
             // 1: Normal, 2: Config, 3: Sleep.
-            // For now, just show that we have catched this.
+            // For now, just show that we have catched this & block input on mode 1 and 2.
                 mode = 1;
                 modeTime = timer;
             }else if (mode == 1 && !breakout){
@@ -185,10 +185,11 @@ int main(){
                 modeTime = timer;
             }
         }
+
         if(!Atomizer_IsOn() && (btnState == BUTTON_MASK_FIRE) && // Only fire if fire is pressed alone.
-            (atomInfo.resistance != 0) && (Atomizer_GetError() == OK) && shouldFire){
+            (atomInfo.resistance != 0) && (Atomizer_GetError() == OK) && shouldFire && mode == 0){
                 Atomizer_Control(1);
-        } else if (Atomizer_IsOn() && !(btnState & BUTTON_MASK_FIRE)){
+        } else if (Atomizer_IsOn() && !(btnState & BUTTON_MASK_FIRE) || !shouldFire){
                 Atomizer_Control(0);
         }
        
@@ -200,7 +201,7 @@ int main(){
             if (timer - buttonSpec[i][2] > 60){
                 buttonSpec[i][0] = 0;
             }
-            if (buttonSpec[i][1] == 1 && (i != 0) && newWatts_Open){
+            if (buttonSpec[i][1] == 1 && (i != 0) && newWatts_Open && mode==0){
                 uint32_t elapsed = timer - buttonSpec[i][2];
 
                 if (elapsed > 60 && elapsed < 180) {

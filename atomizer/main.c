@@ -267,7 +267,7 @@ int main() {
             Timer_DelayMs(FPMS - (timer2-lastTime));
         if (mode == 0){
             siprintf(buf,
-                "P:%3lu.%luW\nV:%3d.%02d\n%1d.%02d Ohm\nBV:%uV\nI:%2d.%02dA\n%s\n%s\n%d %d %d\n%d\n%d",
+                "P:%3lu.%luW\nV:%3d.%02d\n%1d.%02d Ohm\nBV:%uV\nI:%2d.%02dA\n%s\n%s\n%d %d %d\n%d",
                  watts / 1000, watts % 1000 / 100,
                  displayVolts / 1000, displayVolts % 1000 / 10,
                  atomInfo.resistance / 1000, atomInfo.resistance % 1000 / 10, Battery_GetVoltage(),

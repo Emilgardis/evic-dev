@@ -13,13 +13,18 @@
 #define FIRE 0
 #define RIGHT 1
 #define LEFT 2
+#define FPMS 7 // Or 6, something like that is good.
 
 volatile uint32_t buttonSpec[3][3] = {{0},{0},{0}}; // [timesPressed, justPressed, timerWhenUpdate]
-volatile uint32_t timer = 0; // TODO: Handle overflow. Will Currently last 4.97 days.
+volatile uint32_t timer = 0, timer2; // TODO: Handle overflow. Will Currently last 4.97 days.
 volatile uint32_t newWatts = 0; //Is this safe?
 volatile uint8_t newWatts_Open = 1; // If this is true, then newWatts can be modified.
 void timerCallback() {
     timer++;
+}
+
+void timer2Callback() {
+    timer2++;
 }
 
 
@@ -109,6 +114,7 @@ int main() {
     char buf[200];
     uint8_t mode = 0;
     uint32_t modeTime = timer;
+    uint32_t lastTime = timer2; // used for display FPMS.
     const char *atomState, *batteryState;
     uint8_t shouldFire;
     uint16_t volts, displayVolts; /*, battVolts*/ // Unit mV
@@ -123,6 +129,7 @@ int main() {
     Atomizer_SetOutputVoltage(volts);
 
     Timer_CreateTimeout(10, 1, timerCallback, 0);
+    Timer_CreateTimeout(1, 1, timer2Callback, 0);
 
     Button_CreateCallback(buttonFireCallback, BUTTON_MASK_FIRE);
     Button_CreateCallback(buttonRightCallback, BUTTON_MASK_RIGHT);
@@ -157,6 +164,8 @@ int main() {
             uint8_t breakout = 0;
 
             if (elapsed < 60) { // timesFired >= 3 was only for sleep mode.
+                // FIXME: This breaks mode 2, fire needs to be held on the fifth (and last) press.
+                // This could be seen as a feature.
                 breakout = 1;
             }
 
@@ -252,15 +261,33 @@ int main() {
             batteryState = "USB";
         }
         displayVolts = Atomizer_IsOn() ? atomInfo.voltage : volts;
-
-        siprintf(buf, "P:%3lu.%luW\nV:%3d.%02d\n%1d.%02d Ohm\nBV:%uV\nI:%2d.%02dA\n%s\n%s\n%d %d %d\n%d",
+        
+        // When not displaying stuff, the code runs much to fast.
+        if (timer2 - lastTime < FPMS) // Keep update rate.
+            Timer_DelayMs(FPMS - (timer2-lastTime));
+        if (mode == 0){
+            siprintf(buf,
+                "P:%3lu.%luW\nV:%3d.%02d\n%1d.%02d Ohm\nBV:%uV\nI:%2d.%02dA\n%s\n%s\n%d %d %d\n%d\n%d",
                  watts / 1000, watts % 1000 / 100,
                  displayVolts / 1000, displayVolts % 1000 / 10,
                  atomInfo.resistance / 1000, atomInfo.resistance % 1000 / 10, Battery_GetVoltage(),
                  atomInfo.current / 1000, atomInfo.current % 1000 / 10,
-                 atomState, batteryState, buttonSpec[LEFT][0], buttonSpec[FIRE][0], buttonSpec[RIGHT][0], mode);
-        Display_Clear();
-        Display_PutText(0, 0, buf, FONT_DEJAVU_8PT);
-        Display_Update();
+                 atomState, batteryState,
+                 buttonSpec[LEFT][0], buttonSpec[FIRE][0], buttonSpec[RIGHT][0], mode);
+            Display_Clear();
+            Display_PutText(0, 0, buf, FONT_DEJAVU_8PT);
+            Display_Update();
+        }
+        if (mode == 2){
+            Display_Clear();
+            Display_Update();
+            // Hook on interupt (FIRE).
+            // And watch for five presses, then wake. 
+            // FIXME: Maybe this should be it's own loop (?)
+        }
+        if (mode == 1 && 0){ // FIXME: not implemented yet.
+            // Here we can adjust all the settings, eg. change variables like increment and maybe
+            // TC values (when implemented). We should also see if we can store different configs.
+        }
     }
 }

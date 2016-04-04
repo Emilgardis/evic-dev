@@ -9,6 +9,7 @@
 #include <Battery.h>
 
 #include "Bitmap_eVicSDK.h"
+#include "mode0_bitmap.h"
 
 #define FIRE 0
 #define RIGHT 1
@@ -144,7 +145,7 @@ int main() {
         Atomizer_ReadInfo(&atomInfo);
         btnState = Button_GetState(); // Unsure if needed.
 
-        if ((timer - buttonSpec[FIRE][2] > 40))
+        if ((timer - buttonSpec[FIRE][2] > 40) || (Battery_GetVoltage() > 2400))
             shouldFire = 1;
         else
             shouldFire = 0;
@@ -204,7 +205,7 @@ int main() {
         if(!Atomizer_IsOn() && (btnState == BUTTON_MASK_FIRE) && // Only fire if fire is pressed alone.
                 (atomInfo.resistance != 0) && (Atomizer_GetError() == OK) && shouldFire && mode == 0) {
             Atomizer_Control(1);
-        } else if (Atomizer_IsOn() && !(btnState & BUTTON_MASK_FIRE) || !shouldFire) {
+        } else if ((Atomizer_IsOn() && !(btnState & BUTTON_MASK_FIRE)) || !shouldFire) {
             Atomizer_Control(0);
         }
 
@@ -275,7 +276,8 @@ int main() {
                  atomState, batteryState,
                  buttonSpec[LEFT][0], buttonSpec[FIRE][0], buttonSpec[RIGHT][0], mode);
             Display_Clear();
-            Display_PutText(0, 0, buf, FONT_DEJAVU_8PT);
+            Display_PutText(0, 13, buf, FONT_DEJAVU_8PT);
+            Display_PutPixels(0, 0, mode0_bitmap, mode0_bitmap_width, mode0_bitmap_height);
             Display_Update();
         }
         if (mode == 2){

@@ -122,16 +122,16 @@ int main() {
     uint32_t watts; // Unit mW
     uint8_t btnState;/*, battPerc, boardTemp*/
     Atomizer_Info_t atomInfo;
-
+    
     Atomizer_ReadInfo(&atomInfo);
-
+    
     watts = 20000; // Initial wattage
     volts = wattsToVolts(watts, atomInfo.resistance);
     Atomizer_SetOutputVoltage(volts);
-
+    
     Timer_CreateTimeout(10, 1, timerCallback, 0);
     Timer_CreateTimeout(1, 1, timer2Callback, 0);
-
+    
     Button_CreateCallback(buttonFireCallback, BUTTON_MASK_FIRE);
     Button_CreateCallback(buttonRightCallback, BUTTON_MASK_RIGHT);
     Button_CreateCallback(buttonLeftCallback, BUTTON_MASK_LEFT);
@@ -144,12 +144,12 @@ int main() {
     while(1) {
         Atomizer_ReadInfo(&atomInfo);
         btnState = Button_GetState(); // Unsure if needed.
-
-        if ((timer - buttonSpec[FIRE][2] > 40) || (Battery_GetVoltage() > 2400))
+        
+        if ((timer - buttonSpec[FIRE][2] > 40) && (Battery_GetVoltage() > 2400))
             shouldFire = 1;
         else
             shouldFire = 0;
-
+            
         if ((btnState >= BUTTON_MASK_LEFT + BUTTON_MASK_RIGHT) || (btnState == BUTTON_MASK_LEFT + BUTTON_MASK_FIRE) || (btnState == BUTTON_MASK_RIGHT + BUTTON_MASK_FIRE)) {
             newWatts_Open = 0;
         } else if (mode == 0){
@@ -163,26 +163,26 @@ int main() {
             // Current implementation checks if mode was changed in the recent time, and thus doesn't do anything if it was.
             uint32_t elapsed = timer - modeTime;
             uint8_t breakout = 0;
-
+            
             if (elapsed < 60) { // timesFired >= 3 was only for sleep mode.
                 // FIXME: This breaks mode 2, fire needs to be held on the fifth (and last) press.
                 // This could be seen as a feature.
                 breakout = 1;
             }
-
+            
             if (!breakout && (mode != 2) && buttonSpec[FIRE][0] == 5) {
                 mode = 2;
                 modeTime = timer; // Should not be needed when implemented.
                 breakout = 1;
             } else // if
-
+            
                 /* FIXME: This shall be removed later when sleep(powerdown) mode has been implemented by the SDK*/
                 if (!breakout && buttonSpec[FIRE][0] == 5) {
                     mode = 0;
                     modeTime = timer;
                     breakout = 1;
                 }
-
+                
             if (mode == 0 && !breakout) {
                 // Now We are in a special mode! Woo!
                 // This will be implemented but how?
@@ -201,15 +201,15 @@ int main() {
                 modeTime = timer;
             }
         }
-
+        
         if(!Atomizer_IsOn() && (btnState == BUTTON_MASK_FIRE) && // Only fire if fire is pressed alone.
                 (atomInfo.resistance != 0) && (Atomizer_GetError() == OK) && shouldFire && mode == 0) {
             Atomizer_Control(1);
         } else if ((Atomizer_IsOn() && !(btnState & BUTTON_MASK_FIRE)) || !shouldFire) {
             Atomizer_Control(0);
         }
-
-
+        
+        
         for(int i=0; i<=2; i++) {
             uint32_t mod = 1;
             if (i == LEFT)
@@ -219,7 +219,7 @@ int main() {
             }
             if (buttonSpec[i][1] == 1 && (i != 0) && newWatts_Open && mode==0) {
                 uint32_t elapsed = timer - buttonSpec[i][2];
-
+                
                 if (elapsed > 60 && elapsed < 180) {
                     newWatts += mod * 25;
                 } else if (elapsed > 180) {
@@ -227,18 +227,16 @@ int main() {
                 }
             }
         }
-
+        
         if (newWatts > 75000) {
             newWatts = 75000;
         } else if (newWatts < 1000) {
             newWatts = 1000;
         }
         watts = newWatts;
-
-
-
+        
         Atomizer_ReadInfo(&atomInfo);
-
+        
         volts = correctVoltage(volts, watts, atomInfo.resistance);
         Atomizer_SetOutputVoltage(volts);
         switch(Atomizer_GetError()) {

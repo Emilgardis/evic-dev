@@ -18,7 +18,7 @@
 
 volatile uint32_t buttonSpec[3][3] = {{0},{0},{0}}; // [timesPressed, justPressed, timerWhenUpdate]
 volatile uint32_t timer = 0, timer2; // TODO: Handle overflow. Will Currently last 4.97 days.
-volatile uint32_t newWatts = 0; //Is this safe?
+volatile uint32_t newWatts = 0; // Is this safe?
 volatile uint8_t newWatts_Open = 1; // If this is true, then newWatts can be modified.
 void timerCallback() {
     timer++;
@@ -104,23 +104,23 @@ void buttonLeftCallback(uint8_t state) { // Only gets called when something happ
 
 
 int main() {
-    // TODO:    Add Stealth mode.
-    //          Add TCR (Formulas?)
-    //          Add bypass mode. (?)
-    //          Implement a better font. With support for Omega etc.
-    //          Fixed fields for values and strings.
-    //          Add a small snake game. (?) What would the memory impact be? Trigger? left left right right fire 2x.
-    //          See how puff and time is implemented and use these mem locations for something cool.
-    //          Add volt mode. (?)
+    // TODO: Add Stealth mode.
+    //   Add TCR (Formulas?)
+    //   Add bypass mode. (?)
+    //   Implement a better font. With support for Omega etc.
+    //   Fixed fields for values and strings.
+    //   Add a small snake game. (?) What would the memory impact be? Trigger? left left right right fire 2x.
+    //   See how puff and time is implemented and use these mem locations for something cool.
+    //   Add volt mode. (?)
     char buf[200];
     uint8_t mode = 0;
     uint32_t modeTime = timer;
     uint32_t lastTime = timer2; // used for display FPMS.
     const char *atomState, *batteryState;
     uint8_t shouldFire;
-    uint16_t volts, displayVolts; /*, battVolts*/ // Unit mV
+    uint16_t volts, displayVolts; // Unit mV
     uint32_t watts; // Unit mW
-    uint8_t btnState;/*, battPerc, boardTemp*/
+    uint8_t btnState; 
     Atomizer_Info_t atomInfo;
     
     Atomizer_ReadInfo(&atomInfo);
@@ -135,7 +135,7 @@ int main() {
     Button_CreateCallback(buttonFireCallback, BUTTON_MASK_FIRE);
     Button_CreateCallback(buttonRightCallback, BUTTON_MASK_RIGHT);
     Button_CreateCallback(buttonLeftCallback, BUTTON_MASK_LEFT);
-    //Show logo!
+    // Show logo!
     Display_PutPixels(0, 32, Bitmap_evicSdk, Bitmap_evicSdk_width, Bitmap_evicSdk_height);
     Display_Update();
     Timer_DelayMs(500);
@@ -158,15 +158,15 @@ int main() {
             newWatts_Open = 0;
         }
         if(buttonSpec[FIRE][0] >= 3 && buttonSpec[FIRE][1] == 1) {
-            // FIXME, this should only trigger if we are certain we won't
-            // press FIRE again. (time since release > 40?).
-            // Current implementation checks if mode was changed in the recent time, and thus doesn't do anything if it was.
+            // FIXME: this should only trigger if we are certain we won't
+            //   press FIRE again. (time since release > 40?).
+            //   Current implementation checks if mode was changed in the recent time, and thus doesn't do anything if it was.
             uint32_t elapsed = timer - modeTime;
             uint8_t breakout = 0;
             
             if (elapsed < 60) { // timesFired >= 3 was only for sleep mode.
                 // FIXME: This breaks mode 2, fire needs to be held on the fifth (and last) press.
-                // This could be seen as a feature.
+                //   This could be seen as a feature.
                 breakout = 1;
             }
             

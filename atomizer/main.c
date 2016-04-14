@@ -202,7 +202,7 @@ int main() {
             }
         }
         
-        if(!Atomizer_IsOn() && (btnState == BUTTON_MASK_FIRE) && // Only fire if fire is pressed alone.
+        if(!Atomizer_IsOn() && (btnState == BUTTON_MASK_FIRE) && buttonSpec[FIRE][1] && // Only fire if fire is pressed alone.
                 (atomInfo.resistance != 0) && (Atomizer_GetError() == OK) && shouldFire && mode == 0) {
             Atomizer_Control(1);
         } else if ((Atomizer_IsOn() && !(btnState & BUTTON_MASK_FIRE)) || !shouldFire) {
@@ -246,6 +246,9 @@ int main() {
         case OPEN:
             atomState = "NO ATOM";
             break;
+        case WEAK_BATT:
+            atomState = "WEAK BATT";
+            break;
         default:
             atomState = Atomizer_IsOn() ? "FIRING" : "";
             break;
@@ -266,7 +269,7 @@ int main() {
             Timer_DelayMs(FPMS - (timer2-lastTime));
         if (mode == 0){
             siprintf(buf,
-                "P:%3lu.%luW\nV:%3d.%02d\n%1d.%02d Ohm\nBV:%uV\nI:%2d.%02dA\n%s\n%s\n%d %d %d\n%d",
+                "P:%3lu.%luW\nV:%3d.%02d\n%1d.%02d Ohm\nBV:%uV\nI:%2d.%02dA\n%s\n%s\n%d %d %d\n%d\n",
                  watts / 1000, watts % 1000 / 100,
                  displayVolts / 1000, displayVolts % 1000 / 10,
                  atomInfo.resistance / 1000, atomInfo.resistance % 1000 / 10, Battery_GetVoltage(),
@@ -288,6 +291,10 @@ int main() {
         if (mode == 1 && 0){ // FIXME: not implemented yet.
             // Here we can adjust all the settings, eg. change variables like increment and maybe
             // TC values (when implemented). We should also see if we can store different configs.
+        }
+        if (Atomizer_GetError() == WEAK_BATT) {
+            buttonSpec[FIRE][1] == 0;
+            Timer_DelayMs(700);
         }
     }
 }

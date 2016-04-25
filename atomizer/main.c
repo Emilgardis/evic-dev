@@ -179,7 +179,7 @@ int main() {
             } else // if
             
                 /* FIXME: This shall be removed later when sleep(powerdown) mode has been implemented by the SDK*/
-                if (buttonSpec[FIRE][0] == 5) {
+                if (!breakout && buttonSpec[FIRE][0] == 5) {
                     mode = 0;
                     modeTime = timer;
                     breakout = 1;
@@ -272,8 +272,8 @@ int main() {
         if (mode == 0){
             if (!displayIsOn) {
                 displayIsOn = 1;
-                Display_SetOn(1);
             }
+            Display_SetOn(1);
             siprintf(buf,
                 "P:%3lu.%luW\nV:%3d.%02d\n%1d.%02d Ohm\nBV:%uV\nI:%2d.%02dA\n%s\n%s\n%d %d %d\n%d\n",
                  watts / 1000, watts % 1000 / 100,

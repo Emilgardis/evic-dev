@@ -116,6 +116,7 @@ int main() {
     uint8_t mode = 0;
     uint32_t modeTime = timer;
     uint32_t lastTime = timer2; // used for display FPMS.
+    uint8_t displayIsOn = 1; // display is on at start 
     const char *atomState, *batteryState;
     uint8_t shouldFire;
     uint16_t volts, displayVolts; // Unit mV
@@ -171,13 +172,14 @@ int main() {
             }
             
             if (!breakout && (mode != 2) && buttonSpec[FIRE][0] == 5) {
-                mode = 2;
+                mode = 2; // Sleeping
                 modeTime = timer; // Should not be needed when implemented.
                 breakout = 1;
+
             } else // if
             
                 /* FIXME: This shall be removed later when sleep(powerdown) mode has been implemented by the SDK*/
-                if (!breakout && buttonSpec[FIRE][0] == 5) {
+                if (buttonSpec[FIRE][0] == 5) {
                     mode = 0;
                     modeTime = timer;
                     breakout = 1;
@@ -268,6 +270,10 @@ int main() {
         if (timer2 - lastTime < FPMS) // Keep update rate.
             Timer_DelayMs(FPMS - (timer2-lastTime));
         if (mode == 0){
+            if (!displayIsOn) {
+                displayIsOn = 1;
+                Display_SetOn(1);
+            }
             siprintf(buf,
                 "P:%3lu.%luW\nV:%3d.%02d\n%1d.%02d Ohm\nBV:%uV\nI:%2d.%02dA\n%s\n%s\n%d %d %d\n%d\n",
                  watts / 1000, watts % 1000 / 100,
@@ -284,6 +290,8 @@ int main() {
         if (mode == 2){
             Display_Clear();
             Display_Update();
+            Display_SetOn(0);
+            displayIsOn = 0;
             // Hook on interupt (FIRE).
             // And watch for five presses, then wake. 
             // FIXME: Maybe this should be it's own loop (?)

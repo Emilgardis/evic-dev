@@ -38,19 +38,24 @@ uint16_t wattsToVolts(uint32_t watts, uint16_t res) {
     return volts * 10;
 }
 
-void sleep() { 
+void sleep(uint8_t easy_int) { 
     Display_SetOn(0);
     buttonSpec[FIRE][0] = 0;
     // zzz
     uint32_t sleep_start = timer;
     uint8_t sleeping = 1;
+    if (easy_int) {
+        Sys_Sleep();
+        Display_SetOn(1);
+        return;
+    }
     while (buttonSpec[FIRE][0] != 5) {
         // Still sleeping.
         if (timer - buttonSpec[FIRE][2] > 600) { // 6 s
             buttonSpec[FIRE][0] = 0;
         }
-
-        if (timer - (sleep_start-1) > 200){ // 2 minutes.
+        
+        if (timer - (sleep_start-1) > 30000){ // 5 minutes.
                 if (timer - buttonSpec[FIRE][2] > 60) {
                     buttonSpec[FIRE][0] = 0;
                     Sys_Sleep();
@@ -208,7 +213,7 @@ int main() {
                 }
             } else if (buttonSpec[FIRE][0] == 5) {
                 // Now we go to sleep. Sleep lasts for 2 minutes, then it goes into power off.
-                sleep();
+                sleep(0);
                 // wakey wakey!
                 mode = 0;
             }
@@ -301,7 +306,7 @@ int main() {
             }else{
                 Display_SetOn(0);
                 if (timer - timeout < sleepout){
-                    sleep();
+                    sleep(1);
                 }
             }
         }

@@ -15,11 +15,12 @@
 #define RIGHT 1
 #define LEFT 2
 #define FPS 15
+#define sleepout 1200 // ds (12 s)
 volatile uint32_t buttonSpec[3][3] = {{0},{0},{0}}; // [timesPressed, justPressed, timerWhenUpdate]
 volatile uint32_t timer = 0, timer2; // TODO: Handle overflow. Will Currently last 4.97 days.
 volatile uint32_t newWatts = 0; // Is this safe?
 volatile uint8_t newWatts_Open = 1; // If this is true, then newWatts can be modified.
-
+volatile uint32_t sleeptime = 0;
 void timerCallback() {
     timer++;
 }
@@ -35,6 +36,41 @@ uint16_t wattsToVolts(uint32_t watts, uint16_t res) {
     // Round to nearest multiple of 10
     uint16_t volts = (sqrt(watts * res) + 5) / 10;
     return volts * 10;
+}
+
+void sleep() { 
+    Display_SetOn(0);
+    buttonSpec[FIRE][0] = 0;
+    // zzz
+    uint32_t sleep_start = timer;
+    uint8_t sleeping = 1;
+    while (buttonSpec[FIRE][0] != 5) {
+        // Still sleeping.
+        if (timer - buttonSpec[FIRE][2] > 60) {
+            buttonSpec[FIRE][0] = 0;
+        }
+
+        if (timer - (sleep_start-1) > 200){ // 2 minutes.
+                if (timer - buttonSpec[FIRE][2] > 60) {
+                    buttonSpec[FIRE][0] = 0;
+                    Sys_Sleep();
+                }
+                if (sleeping == 1) {
+                    Display_SetPowerOn(0);
+                    sleeping = 2;
+                } else if (sleeping == 2) {
+                    // Check if presses == 5, then break out, else continue
+                    if (buttonSpec[FIRE][0] == 5) {
+                        sleeping = 0;
+                    }
+                //Wake.
+            }
+        }
+    }
+    buttonSpec[FIRE][0] = 0;
+    
+    Display_SetPowerOn(1);
+    Display_SetOn(1);
 }
 
 uint16_t correctVoltage(uint16_t currentVolt, uint32_t currentWatt, uint16_t res) {
@@ -120,6 +156,7 @@ int main() {
     const char *atomState, *batteryState;
     uint8_t shouldFire;
     uint8_t sleeping = 0;
+    uint32_t timeout = timer;
     uint16_t volts, displayVolts; // Unit mV
     uint32_t watts; // Unit mW
     uint8_t btnState; 
@@ -160,50 +197,20 @@ int main() {
             newWatts_Open = 0;
         }
         
-        if (!sleeping && buttonSpec[FIRE][0] >= 3 && buttonSpec[FIRE][1] == 1 && timer - buttonSpec[FIRE][2] < 20) { // can we try zero here?
-            if (buttonSpec[FIRE][0] == 3) {
+        if (buttonSpec[FIRE][0] >= 3 && buttonSpec[FIRE][1] == 1 && timer - buttonSpec[FIRE][2] < 50) { // can we try zero here?
+            if (buttonSpec[FIRE][0] == 3 && timer - modeTime > 50) {
                 if (mode == 0) { // Switch to config
                     mode = 1;
+                    modeTime = timer;
                 } else if (mode == 1) { // Switch to normal mode.
                     mode = 0;
+                    modeTime = timer;
                 }
             } else if (buttonSpec[FIRE][0] == 5) {
                 // Now we go to sleep. Sleep lasts for 2 minutes, then it goes into power off.
-                if (!sleeping) {
-                    Display_SetOn(0);
-                    sleeping = 1;
-                    buttonSpec[FIRE][0] = 0;
-                    // zzz
-                    uint32_t sleep_start = timer;
-                    while (buttonSpec[FIRE][0] != 5) {
-                        // Still sleeping.
-                        if (timer - buttonSpec[FIRE][2] > 60) {
-                            buttonSpec[FIRE][0] = 0;
-                        }
-
-                        if (timer - (sleep_start-1) > 200){ // 2 minutes.
-                                if (timer - buttonSpec[FIRE][2] > 60) {
-                                    buttonSpec[FIRE][0] = 0;
-                                    Sys_Sleep();
-                                }
-                                if (sleeping == 1) {
-                                    Display_SetPowerOn(0);
-                                    sleeping = 2;
-                                } else if (sleeping == 2) {
-                                    // Check if presses == 5, then break out, else continue
-                                    if (buttonSpec[FIRE] == 5) {
-                                        sleeping = 0;
-                                    }
-                                //Wake.
-                            }
-                        }
-                    }
-                    buttonSpec[FIRE][0] = 0;
-
-                    Display_SetPowerOn(1);
-                    Display_SetOn(1);
-                    sleeping = 0;
-                }
+                sleep();
+                // wakey wakey!
+                mode = 0;
             }
         }
 
@@ -231,6 +238,8 @@ int main() {
                     newWatts += mod * 350;
                 }
             }
+            if (buttonSpec[i][1] == 1)
+                timeout = timer;
         }
         
         if (newWatts > 75000) {
@@ -273,20 +282,27 @@ int main() {
         //if (timer2 - lastTime < FPMS) // Keep update rate.
         //    Timer_DelayMs(FPMS - (timer2-lastTime));
         if (mode == 0){
-            if (timer2 - lastTime > FPS){
-                siprintf(buf,
-                "P:%3lu.%luW\nV:%3d.%02d\n%1d.%02d Ohm\nBV:%uV\nI:%2d.%02dA\n%s\n%s\n%d %d %d\n%d\n",
-                 watts / 1000, watts % 1000 / 100,
-                 displayVolts / 1000, displayVolts % 1000 / 10,
-                 atomInfo.resistance / 1000, atomInfo.resistance % 1000 / 10, Battery_GetVoltage(),
-                 atomInfo.current / 1000, atomInfo.current % 1000 / 10,
-                 atomState, batteryState,
-                 buttonSpec[LEFT][0], buttonSpec[FIRE][0], buttonSpec[RIGHT][0], mode);
-                Display_Clear();
-                Display_PutText(0, 13, buf, FONT_DEJAVU_8PT);
-                Display_PutPixels(0, 0, mode0_bitmap, mode0_bitmap_width, mode0_bitmap_height);
-                Display_Update();
-                lastTime = timer2;
+            if (timer - timeout < 1200){
+                if (timer2 - lastTime > FPS){
+                    siprintf(buf,
+                    "P:%3lu.%luW\nV:%3d.%02d\n%1d.%02d Ohm\nBV:%uV\nI:%2d.%02dA\n%s\n%s\n%d %d %d\n%d\n",
+                     watts / 1000, watts % 1000 / 100,
+                     displayVolts / 1000, displayVolts % 1000 / 10,
+                     atomInfo.resistance / 1000, atomInfo.resistance % 1000 / 10, Battery_GetVoltage(),
+                     atomInfo.current / 1000, atomInfo.current % 1000 / 10,
+                     atomState, batteryState,
+                     buttonSpec[LEFT][0], buttonSpec[FIRE][0], buttonSpec[RIGHT][0], mode);
+                    Display_Clear();
+                    Display_PutText(0, 13, buf, FONT_DEJAVU_8PT);
+                    Display_PutPixels(0, 0, mode0_bitmap, mode0_bitmap_width, mode0_bitmap_height);
+                    Display_Update();
+                    lastTime = timer2;
+                }
+            }else{
+                Display_SetOn(0);
+                if (timer - timeout < 5000){
+                    sleep();
+                }
             }
         }
         if (mode == 2){

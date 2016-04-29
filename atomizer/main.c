@@ -20,6 +20,7 @@ volatile uint32_t buttonSpec[3][3] = {{0},{0},{0}}; // [timesPressed, justPresse
 volatile uint32_t timer = 0, timer2; // TODO: Handle overflow. Will Currently last 4.97 days.
 volatile uint32_t newWatts = 0; // Is this safe?
 volatile uint8_t newWatts_Open = 1; // If this is true, then newWatts can be modified.
+
 void timerCallback() {
     timer++;
 }
@@ -119,6 +120,7 @@ int main() {
     uint8_t displayIsOn = 1; // display is on at start 
     const char *atomState, *batteryState;
     uint8_t shouldFire;
+    uint8_t sleeping = 0;
     uint16_t volts, displayVolts; // Unit mV
     uint32_t watts; // Unit mW
     uint8_t btnState; 
@@ -158,55 +160,57 @@ int main() {
         } else {
             newWatts_Open = 0;
         }
-        if(buttonSpec[FIRE][0] >= 3 && buttonSpec[FIRE][1] == 1) {
-            // FIXME: this should only trigger if we are certain we won't
-            //   press FIRE again. (time since release > 40?).
-            //   Current implementation checks if mode was changed in the recent time, and thus doesn't do anything if it was.
-            uint32_t elapsed = timer - modeTime;
-            uint8_t breakout = 0;
-            
-            if (elapsed < 60) { // timesFired >= 3 was only for sleep mode.
-                // FIXME: This breaks mode 2, fire needs to be held on the fifth (and last) press.
-                //   This could be seen as a feature.
-                breakout = 1;
-            }
-            
-            if (!breakout && (mode != 2) && buttonSpec[FIRE][0] == 5) {
-                mode = 2; // Sleeping
-                modeTime = timer; // Should not be needed when implemented.
-                breakout = 1;
-
-            } else // if
-            
-                /* FIXME: This shall be removed later when sleep(powerdown) mode has been implemented by the SDK*/
-                if (!breakout && buttonSpec[FIRE][0] == 5) {
+        
+        if (!sleeping && buttonSpec[FIRE][0] >= 3 && buttonSpec[FIRE][1] == 1 && timer - buttonSpec[FIRE][2] < 20) { // can we try zero here?
+            if (buttonSpec[FIRE][0] == 3) {
+                if (mode == 0) { // Switch to config
+                    mode = 1;
+                } else if (mode == 1) { // Switch to normal mode.
                     mode = 0;
-                    modeTime = timer;
-                    breakout = 1;
                 }
-                
-            if (mode == 0 && !breakout) {
-                // Now We are in a special mode! Woo!
-                // This will be implemented but how?
-                // Ideas: We separate the display and wattage update
-                // -portion of this code into their own functions.
-                // And then depending on a variable called 'mode', we will
-                // Do the proper handling of button pushes.
-                // 'mode' will be set to three states
-                // 1: Normal, 2: Config, 3: Sleep.
-                // For now, just show that we have catched this & block input on mode 1 and 2.
-                mode = 1;
-                modeTime = timer;
-            } else if (mode == 1 && !breakout) {
-                // Exit config mode
-                mode = 0;
-                modeTime = timer;
+            } else if (buttonSpec[FIRE][0] == 5) {
+                // Now we go to sleep. Sleep lasts for 2 minutes, then it goes into power off.
+                if (!sleeping) {
+                    Display_SetOn(0);
+                    sleeping = 1;
+                    buttonSpec[FIRE][0] = 0;
+                    // zzz
+                    uint32_t sleep_start = timer;
+                    while (buttonSpec[FIRE][0] != 5) {
+                        // Still sleeping.
+                        if (timer - buttonSpec[FIRE][2] > 60) {
+                            buttonSpec[FIRE][0] = 0;
+                        }
+
+                        if (timer - (sleep_start-1) > 200){ // 2 minutes.
+                                if (timer - buttonSpec[FIRE][2] > 60) {
+                                    buttonSpec[FIRE][0] = 0;
+                                    Sys_Sleep();
+                                }
+                                if (sleeping == 1) {
+                                    Display_SetPowerOn(0);
+                                    sleeping = 2;
+                                } else if (sleeping == 2) {
+                                    // Check if presses == 5, then break out, else continue
+                                    if (buttonSpec[FIRE] == 5) {
+                                        sleeping = 0;
+                                    }
+                                //Wake.
+                            }
+                        }
+                    }
+                    buttonSpec[FIRE][0] = 0;
+
+                    Display_SetPowerOn(1);
+                    Display_SetOn(1);
+                    sleeping = 0;
+                }
             }
         }
-        
+
         if(!Atomizer_IsOn() && (btnState == BUTTON_MASK_FIRE) && buttonSpec[FIRE][1] && // Only fire if fire is pressed alone.
                 (atomInfo.resistance != 0) && (Atomizer_GetError() == OK) && shouldFire && mode == 0) {
-            Atomizer_Control(1);
+             Atomizer_Control(1);
         } else if ((Atomizer_IsOn() && !(btnState & BUTTON_MASK_FIRE)) || !shouldFire) {
             Atomizer_Control(0);
         }
@@ -270,10 +274,6 @@ int main() {
         if (timer2 - lastTime < FPMS) // Keep update rate.
             Timer_DelayMs(FPMS - (timer2-lastTime));
         if (mode == 0){
-            if (!displayIsOn) {
-                displayIsOn = 1;
-            }
-            Display_SetOn(1);
             siprintf(buf,
                 "P:%3lu.%luW\nV:%3d.%02d\n%1d.%02d Ohm\nBV:%uV\nI:%2d.%02dA\n%s\n%s\n%d %d %d\n%d\n",
                  watts / 1000, watts % 1000 / 100,
@@ -290,18 +290,16 @@ int main() {
         if (mode == 2){
             Display_Clear();
             Display_Update();
-            Display_SetOn(0);
-            displayIsOn = 0;
             // Hook on interupt (FIRE).
             // And watch for five presses, then wake. 
             // FIXME: Maybe this should be it's own loop (?)
         }
-        if (mode == 1 && 0){ // FIXME: not implemented yet.
+        if (mode == 1 && 0) { // FIXME: not implemented yet.
             // Here we can adjust all the settings, eg. change variables like increment and maybe
             // TC values (when implemented). We should also see if we can store different configs.
         }
         if (Atomizer_GetError() == WEAK_BATT) {
-            buttonSpec[FIRE][1] == 0;
+            buttonSpec[FIRE][1] = 0;
             Timer_DelayMs(700);
         }
     }

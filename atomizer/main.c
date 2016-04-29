@@ -15,7 +15,7 @@
 #define RIGHT 1
 #define LEFT 2
 #define FPS 15
-#define sleepout 1200 // ds (12 s)
+#define sleepout 6000 // ds (60 s)
 volatile uint32_t buttonSpec[3][3] = {{0},{0},{0}}; // [timesPressed, justPressed, timerWhenUpdate]
 volatile uint32_t timer = 0, timer2; // TODO: Handle overflow. Will Currently last 4.97 days.
 volatile uint32_t newWatts = 0; // Is this safe?
@@ -46,7 +46,7 @@ void sleep() {
     uint8_t sleeping = 1;
     while (buttonSpec[FIRE][0] != 5) {
         // Still sleeping.
-        if (timer - buttonSpec[FIRE][2] > 60) {
+        if (timer - buttonSpec[FIRE][2] > 600) { // 6 s
             buttonSpec[FIRE][0] = 0;
         }
 
@@ -285,13 +285,13 @@ int main() {
             if (timer - timeout < 1200){
                 if (timer2 - lastTime > FPS){
                     siprintf(buf,
-                    "P:%3lu.%luW\nV:%3d.%02d\n%1d.%02d Ohm\nBV:%uV\nI:%2d.%02dA\n%s\n%s\n%d %d %d\n%d\n",
+                    "P:%3lu.%luW\nV:%3d.%02d\n%1d.%02d Ohm\nBV:%uV\nI:%2d.%02dA\n%s\n%s\n%d %d %d",
                      watts / 1000, watts % 1000 / 100,
                      displayVolts / 1000, displayVolts % 1000 / 10,
                      atomInfo.resistance / 1000, atomInfo.resistance % 1000 / 10, Battery_GetVoltage(),
                      atomInfo.current / 1000, atomInfo.current % 1000 / 10,
                      atomState, batteryState,
-                     buttonSpec[LEFT][0], buttonSpec[FIRE][0], buttonSpec[RIGHT][0], mode);
+                     buttonSpec[LEFT][0], buttonSpec[FIRE][0], buttonSpec[RIGHT][0]);
                     Display_Clear();
                     Display_PutText(0, 13, buf, FONT_DEJAVU_8PT);
                     Display_PutPixels(0, 0, mode0_bitmap, mode0_bitmap_width, mode0_bitmap_height);
@@ -300,21 +300,15 @@ int main() {
                 }
             }else{
                 Display_SetOn(0);
-                if (timer - timeout < 5000){
+                if (timer - timeout < sleepout){
                     sleep();
                 }
             }
         }
-        if (mode == 2){
-            Display_Clear();
-            Display_Update();
-            // Hook on interupt (FIRE).
-            // And watch for five presses, then wake. 
-            // FIXME: Maybe this should be it's own loop (?)
-        }
         if (mode == 1 && 0) { // FIXME: not implemented yet.
             // Here we can adjust all the settings, eg. change variables like increment and maybe
             // TC values (when implemented). We should also see if we can store different configs.
+            
         }
         if (Atomizer_GetError() == WEAK_BATT) {
             buttonSpec[FIRE][1] = 0;

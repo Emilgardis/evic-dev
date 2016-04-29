@@ -200,7 +200,7 @@ int main() {
         if (buttonSpec[FIRE][0] >= 3 && buttonSpec[FIRE][1] == 1 && timer - buttonSpec[FIRE][2] < 50) { // can we try zero here?
             if (buttonSpec[FIRE][0] == 3 && timer - modeTime > 50) {
                 if (mode == 0) { // Switch to config
-                    mode = 1;
+                    mode = 0; // Should be 1, since this hasn't been impolemented yet, we ignore
                     modeTime = timer;
                 } else if (mode == 1) { // Switch to normal mode.
                     mode = 0;

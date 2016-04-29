@@ -14,8 +14,7 @@
 #define FIRE 0
 #define RIGHT 1
 #define LEFT 2
-#define FPMS 7 // Or 6, something like that is good.
-
+#define FPS 15
 volatile uint32_t buttonSpec[3][3] = {{0},{0},{0}}; // [timesPressed, justPressed, timerWhenUpdate]
 volatile uint32_t timer = 0, timer2; // TODO: Handle overflow. Will Currently last 4.97 days.
 volatile uint32_t newWatts = 0; // Is this safe?
@@ -271,10 +270,11 @@ int main() {
         displayVolts = Atomizer_IsOn() ? atomInfo.voltage : volts;
         
         // When not displaying stuff, the code runs much to fast.
-        if (timer2 - lastTime < FPMS) // Keep update rate.
-            Timer_DelayMs(FPMS - (timer2-lastTime));
+        //if (timer2 - lastTime < FPMS) // Keep update rate.
+        //    Timer_DelayMs(FPMS - (timer2-lastTime));
         if (mode == 0){
-            siprintf(buf,
+            if (timer2 - lastTime > FPS){
+                siprintf(buf,
                 "P:%3lu.%luW\nV:%3d.%02d\n%1d.%02d Ohm\nBV:%uV\nI:%2d.%02dA\n%s\n%s\n%d %d %d\n%d\n",
                  watts / 1000, watts % 1000 / 100,
                  displayVolts / 1000, displayVolts % 1000 / 10,
@@ -282,10 +282,12 @@ int main() {
                  atomInfo.current / 1000, atomInfo.current % 1000 / 10,
                  atomState, batteryState,
                  buttonSpec[LEFT][0], buttonSpec[FIRE][0], buttonSpec[RIGHT][0], mode);
-            Display_Clear();
-            Display_PutText(0, 13, buf, FONT_DEJAVU_8PT);
-            Display_PutPixels(0, 0, mode0_bitmap, mode0_bitmap_width, mode0_bitmap_height);
-            Display_Update();
+                Display_Clear();
+                Display_PutText(0, 13, buf, FONT_DEJAVU_8PT);
+                Display_PutPixels(0, 0, mode0_bitmap, mode0_bitmap_width, mode0_bitmap_height);
+                Display_Update();
+                lastTime = timer2;
+            }
         }
         if (mode == 2){
             Display_Clear();

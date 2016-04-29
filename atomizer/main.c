@@ -304,5 +304,6 @@ int main() {
             buttonSpec[FIRE][1] = 0;
             Timer_DelayMs(700);
         }
+        Timer_DelayMs(10);
     }
 }

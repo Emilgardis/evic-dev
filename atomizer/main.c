@@ -69,7 +69,7 @@ void sleep(uint8_t easy_int) {
                     sleeping = 2;
                 } else if (sleeping == 2) {
                     // Check if presses == 5, then break out, else continue
-                    if (buttonSpec[FIRE][0] == presses_to_wake) {
+                    if (buttonSpec[FIRE][0] == 5) {
                         sleeping = 0;
                     }
                 //Wake.

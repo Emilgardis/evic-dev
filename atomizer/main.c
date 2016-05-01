@@ -7,6 +7,7 @@
 #include <Button.h>
 #include <TimerUtils.h>
 #include <Battery.h>
+#include <System.h>
 
 #include "Bitmap_eVicSDK.h"
 #include "mode0_bitmap.h"
@@ -44,18 +45,21 @@ void sleep(uint8_t easy_int) {
     // zzz
     uint32_t sleep_start = timer;
     uint8_t sleeping = 1;
+    uint8_t presses_to_wake = 5;
+    uint8_t mask = SYS_WAKEUP_FIRE;
+    uint16_t time_till_sleep = 12000; // 2 Minutes.
     if (easy_int) {
-        Sys_Sleep();
-        Display_SetOn(1);
-        return;
+        time_till_sleep = 30000; // 5 minutes
+        presses_to_wake = 1;
     }
-    while (buttonSpec[FIRE][0] != 5) {
+    Sys_SetWakeupSource(mask);
+    while (buttonSpec[FIRE][0] != presses_to_wake) {
         // Still sleeping.
         if (timer - buttonSpec[FIRE][2] > 600) { // 6 s
             buttonSpec[FIRE][0] = 0;
         }
         
-        if (timer - (sleep_start-1) > 30000){ // 5 minutes.
+        if (timer - (sleep_start-1) > time_till_sleep){ // 5 minutes.
                 if (timer - buttonSpec[FIRE][2] > 60) {
                     buttonSpec[FIRE][0] = 0;
                     Sys_Sleep();
@@ -65,7 +69,7 @@ void sleep(uint8_t easy_int) {
                     sleeping = 2;
                 } else if (sleeping == 2) {
                     // Check if presses == 5, then break out, else continue
-                    if (buttonSpec[FIRE][0] == 5) {
+                    if (buttonSpec[FIRE][0] == presses_to_wake) {
                         sleeping = 0;
                     }
                 //Wake.

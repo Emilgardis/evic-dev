@@ -11,6 +11,7 @@
 
 #include "Bitmap_eVicSDK.h"
 #include "mode0_bitmap.h"
+#include "charging_bitmap.h"
 
 #define FIRE 0
 #define RIGHT 1
@@ -39,8 +40,17 @@ uint16_t wattsToVolts(uint32_t watts, uint16_t res) {
     return volts * 10;
 }
 
-void sleep(uint8_t easy_int) { 
-    Display_SetOn(0);
+void sleep(uint8_t easy_int) {
+    if (!Battery_IsPresent()) {
+        Display_SetOn(0);
+    } else if (Battery_IsCharging()) {
+        char buf[10];
+        siprintf(buf, "%d%%", Battery_VoltageToPercent(Battery_GetVoltage()));
+        Display_Clear();
+        Display_PutPixels(7, 32, charging_bitmap, charging_bitmap_width, charging_bitmap_height);
+        Display_PutText(7, 32+12, buf, FONT_DEJAVU_8PT);
+        Display_Update();
+    }
     buttonSpec[FIRE][0] = 0;
     // zzz
     uint32_t sleep_start = timer;
@@ -55,13 +65,30 @@ void sleep(uint8_t easy_int) {
     Sys_SetWakeupSource(mask);
     while (buttonSpec[FIRE][0] != presses_to_wake) {
         // Still sleeping.
-        if (timer - buttonSpec[FIRE][2] > 600) { // 6 s
+        if (timer - buttonSpec[FIRE][2] > 60) {
             buttonSpec[FIRE][0] = 0;
         }
-        
-        if (timer - (sleep_start-1) > time_till_sleep){ // 5 minutes.
+        if (timer % 10 == 0 && sleeping == 1){
+            if (Battery_IsPresent()) {
+                if (Battery_IsCharging()) {
+                    Display_SetOn(1);
+                    char buf[10];
+                    siprintf(buf, "%d%%", Battery_VoltageToPercent(Battery_GetVoltage()));
+                    Display_Clear();
+                    Display_PutPixels(7, 32, charging_bitmap, charging_bitmap_width, charging_bitmap_height);
+                    Display_PutText(7, 32+12, buf, FONT_DEJAVU_8PT);
+                    Display_Update();
+                } else {
+                    Display_Clear();
+                    Display_SetOn(0);
+                }
+            } else {
+                Display_Clear();
+                Display_SetOn(0);
+            }
+        }
+        if (timer - (sleep_start) > time_till_sleep){
                 if (timer - buttonSpec[FIRE][2] > 60) {
-                    buttonSpec[FIRE][0] = 0;
                     Sys_Sleep();
                 }
                 if (sleeping == 1) {
@@ -276,14 +303,16 @@ int main() {
             atomState = Atomizer_IsOn() ? "FIRING" : "";
             break;
         }
-        if (Battery_IsPresent()) {
-            if (Battery_IsCharging()) {
-                batteryState = "Charging";
+        if (timer % 10 == 0) {
+            if (Battery_IsPresent()) {
+                if (Battery_IsCharging()) {
+                    batteryState = "Charging";
+                } else {
+                    batteryState = "";
+                }
             } else {
-                batteryState = "";
+                batteryState = "USB";
             }
-        } else {
-            batteryState = "USB";
         }
         displayVolts = Atomizer_IsOn() ? atomInfo.voltage : volts;
         
@@ -308,7 +337,6 @@ int main() {
                     lastTime = timer2;
                 }
             }else{
-                Display_SetOn(0);
                 if (timer - timeout < sleepout){
                     sleep(1);
                 }

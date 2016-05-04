@@ -17,12 +17,13 @@
 #define RIGHT 1
 #define LEFT 2
 #define FPS 15
-#define sleepout 6000 // ds (60 s)
+volatile uint16_t sleepout = 6000; // ds (60 s)
+volatile uint32_t sleeptime = 0;
 volatile uint32_t buttonSpec[3][3] = {{0},{0},{0}}; // [timesPressed, justPressed, timerWhenUpdate]
 volatile uint32_t timer = 0, timer2; // TODO: Handle overflow. Will Currently last 4.97 days.
 volatile uint32_t newWatts = 0; // Is this safe?
 volatile uint8_t newWatts_Open = 1; // If this is true, then newWatts can be modified.
-volatile uint32_t sleeptime = 0;
+volatile uint8_t selectedItem = 0;
 void timerCallback() {
     timer++;
 }
@@ -75,7 +76,7 @@ void sleep(uint8_t easy_int) {
                     char buf[10];
                     siprintf(buf, "%d%%", Battery_VoltageToPercent(Battery_GetVoltage()));
                     Display_Clear();
-                    Display_PutPixels(7, 32, charging_bitmap, charging_bitmap_width, charging_bitmap_height);
+                    Display_PutPixels(7, 32, charging_bitmap, charging_bitmap_width, charging_bitmap_height, 0);
                     Display_PutText(7, 32+12, buf, FONT_DEJAVU_8PT);
                     Display_Update();
                 } else {
@@ -211,7 +212,7 @@ int main() {
     Button_CreateCallback(buttonRightCallback, BUTTON_MASK_RIGHT);
     Button_CreateCallback(buttonLeftCallback, BUTTON_MASK_LEFT);
     // Show logo!
-    Display_PutPixels(0, 32, Bitmap_evicSdk, Bitmap_evicSdk_width, Bitmap_evicSdk_height);
+    Display_PutPixels(0, 32, Bitmap_evicSdk, Bitmap_evicSdk_width, Bitmap_evicSdk_height, 0);
     Display_Update();
     Timer_DelayMs(500);
     // Main loop!
@@ -332,7 +333,7 @@ int main() {
                      buttonSpec[LEFT][0], buttonSpec[FIRE][0], buttonSpec[RIGHT][0]);
                     Display_Clear();
                     Display_PutText(0, 13, buf, FONT_DEJAVU_8PT);
-                    Display_PutPixels(0, 0, mode0_bitmap, mode0_bitmap_width, mode0_bitmap_height);
+                    Display_PutPixels(0, 0, mode0_bitmap, mode0_bitmap_width, mode0_bitmap_height, 0);
                     Display_Update();
                     lastTime = timer2;
                 }

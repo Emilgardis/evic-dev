@@ -9,10 +9,12 @@
 #include <Battery.h>
 #include <System.h>
 
+#include "Font_AnonPro_8pt.c"
 #include "Bitmap_eVicSDK.h"
 #include "mode0_bitmap.h"
 #include "charging_bitmap.h"
-
+#include <Font_Data.h>
+#define FONT_ANONPRO_8PT (&Font_AnonymousPro_8pt_FontInfo)
 #define FIRE 0
 #define RIGHT 1
 #define LEFT 2
@@ -48,7 +50,7 @@ void sleep(uint8_t easy_int) {
         char buf[10];
         siprintf(buf, "%d%%", Battery_VoltageToPercent(Battery_GetVoltage()));
         Display_Clear();
-        Display_PutPixels(7, 32, charging_bitmap, charging_bitmap_width, charging_bitmap_height);
+        Display_PutPixels(7, 32, charging_bitmap, charging_bitmap_width, charging_bitmap_height, 0);
         Display_PutText(7, 32+12, buf, FONT_DEJAVU_8PT);
         Display_Update();
     }
@@ -332,7 +334,7 @@ int main() {
                      atomState, batteryState,
                      buttonSpec[LEFT][0], buttonSpec[FIRE][0], buttonSpec[RIGHT][0]);
                     Display_Clear();
-                    Display_PutText(0, 13, buf, FONT_DEJAVU_8PT);
+                    Display_PutText(0, 13, buf, FONT_ANONPRO_8PT);
                     Display_PutPixels(0, 0, mode0_bitmap, mode0_bitmap_width, mode0_bitmap_height, 0);
                     Display_Update();
                     lastTime = timer2;
